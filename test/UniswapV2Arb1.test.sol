@@ -8,6 +8,7 @@ import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUn
 import {
     DAI,
     WETH,
+    MKR,
     UNISWAP_V2_ROUTER_02,
     SUSHISWAP_V2_ROUTER_02,
     UNISWAP_V2_PAIR_DAI_WETH,
@@ -20,7 +21,9 @@ contract UniswapV2Arb1Test is Test {
     IUniswapV2Router02 private constant sushiswap_router = IUniswapV2Router02(SUSHISWAP_V2_ROUTER_02);
     IERC20 private constant dai = IERC20(DAI);
     IWETH private constant weth = IWETH(WETH);
+    IERC20 private constant mkr = IERC20(MKR);
     address constant user = address(11);
+    address constant lp = address(12);
 
     UniswapV2Arbitrage private arb;
 
@@ -49,6 +52,27 @@ contract UniswapV2Arb1Test is Test {
         deal(DAI, user, 10000 * 1e18);
         vm.prank(user);
         dai.approve(address(arb), type(uint256).max);
+
+        // Setup - add liquidity to DAI-MKR pair, to support flash swap test
+        deal(DAI, lp, 50000 * 1e18);
+        deal(MKR, lp, 50 * 1e18);
+        
+        vm.startPrank(lp);
+        dai.approve(address(uni_router), type(uint256).max);
+        mkr.approve(address(uni_router), type(uint256).max);
+        
+        // add liquidity to DAI-MKR pair
+        uni_router.addLiquidity({
+            tokenA: DAI,
+            tokenB: MKR,
+            amountADesired: 50000 * 1e18,
+            amountBDesired: 50 * 1e18,
+            amountAMin: 1,
+            amountBMin: 1,
+            to: lp,
+            deadline: block.timestamp
+        });
+        vm.stopPrank();
     }
 
     function test_swap() public {
@@ -72,19 +96,20 @@ contract UniswapV2Arb1Test is Test {
         console2.log("profit", bal1 - bal0);
     }
 
-    // Pool liquidity is too low, this test will fail
     function test_flashSwap() public {
+        // borrow DAI from DAI-MKR pair (not participating in arbitrage path)
+        // then arbitrage between Uniswap and Sushiswap DAI-WETH pair
         uint256 bal0 = dai.balanceOf(user);
         vm.prank(user);
         arb.flashSwap(
-            UNISWAP_V2_PAIR_DAI_MKR,
-            true,
+            UNISWAP_V2_PAIR_DAI_MKR,  // borrow DAI from DAI-MKR pair (has enough liquidity)
+            true,                      // DAI is token0
             UniswapV2Arbitrage.SwapParams({
                 router0: UNISWAP_V2_ROUTER_02,
                 router1: SUSHISWAP_V2_ROUTER_02,
                 tokenIn: DAI,
                 tokenOut: WETH,
-                amountIn: 10000 * 1e18,
+                amountIn: 10000 * 1e18,  // borrow 10000 DAI
                 minProfit: 1
             })
         );
