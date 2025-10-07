@@ -2,5 +2,16 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+solc_version = "0.8.24"
+
+remappings = [
+  "@uniswap/v2-core/=lib/v2-core/",
+  "@uniswap/v2-periphery/=lib/v2-periphery/",
+  "@openzeppelin/=lib/openzeppelin-contracts/",
+  "forge-std/=lib/forge-std/src/"
+]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+# FORK_URL=https://eth-mainnet.g.alchemy.com/v2/<your_alchemy_api_key>
+# forge test --fork-url $FORK_URL --match-path test/UniswapV2Arb1.test.sol -vvv
